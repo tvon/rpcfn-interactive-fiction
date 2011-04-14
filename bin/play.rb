@@ -77,7 +77,6 @@ class Action < GameObject
   end
 
   def succeeds?(context)
-
     true
   end
 end
@@ -91,6 +90,14 @@ class Context
 
   def been_here?
     @room.seenit
+  end
+
+  def carrying?(item_id)
+    @inventory.include? item_id
+  end
+
+  def things_here
+    @room.objects
   end
 
 end
@@ -205,7 +212,7 @@ class Game
   end
 
   def show_objects
-    @context.room.objects.each do |id|
+    @context.things_here.each do |id|
       @output.write @objects[id].to_s + "\n"
     end
   end
@@ -215,13 +222,14 @@ class Game
   #################################
 
   def take
-    item = @context.arg
+    item_id = @context.arg
 
     start_len = @context.inventory.length
-    @context.room.objects.each do |obj|
-      if @objects[obj].terms.map{|i| i.downcase}.include? item
+
+    @context.things_here.each do |obj|
+      if @objects[obj].terms.map{|i| i.downcase}.include? item_id
         @context.inventory << obj
-        @context.room.objects.delete obj
+        @context.things_here.delete obj
         @output.write "OK\n"
       end
     end
@@ -237,7 +245,7 @@ class Game
     start_len = @context.inventory.length
     @context.inventory.each do |obj|
       if @objects[obj].terms.map{|i| i.downcase}.include? item
-        @context.room.objects << obj
+        @context.things_here << obj
         @context.inventory.delete obj
         @output.write "OK\n"
       end
