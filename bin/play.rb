@@ -52,7 +52,7 @@ class Room < GameObject
   
 end
 
-class Obj < GameObject
+class Item < GameObject
 
   attr_accessor :id, :description, :terms
 
@@ -195,12 +195,12 @@ class Game
 
       items = {}
       data.scan /^Object (?<id>.*?):\n(?<block>.*?)\n\n/m do |id, block|
-        items[id] = Obj.new(id, block)
+        items[id] = Item.new(id, block)
 
         # TODO: Easier to have a mapping for each item term as well as the "internal id"
-        #items[id].terms.each do |term|
-        #  items[term] = items[id]
-        #end
+        items[id].terms.each do |term|
+          items[term] = items[id]
+        end
 
       end
 
@@ -302,6 +302,7 @@ class Game
         @context.things_here << obj
         @context.inventory.delete obj
         @writer.success "OK"
+        prompt
       end
     end
 
@@ -346,6 +347,7 @@ class Game
         @context.inventory << obj
         @context.things_here.delete obj
         @writer.success "OK"
+        prompt
       end
     end
 
