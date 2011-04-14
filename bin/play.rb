@@ -86,7 +86,7 @@ class Game
 
     @rooms = {}
     @objects = {}
-    @context = {:room => nil, :inventory => []}
+    @context = {:room => nil, :inventory => [], :command => nil}
 
     open(path, 'rb') do |f|
       # Inelegant but effective, initially just scan for each object type we know about
@@ -126,9 +126,9 @@ class Game
       @output.write "You're " + @context[:room].title + ".\n"
     else
       @output.write @context[:room].description + "\n"
+      show_objects
       @context[:room].seenit = true
     end
-    show_objects
     prompt
   end
 
