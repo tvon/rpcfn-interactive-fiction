@@ -122,9 +122,11 @@ class Game
   end
 
   def refresh
-    if @context[:room].seenit
+
+    # Short summary if we've moved into this room and we've been here before.
+    if (@context[:room].seenit && (%w{north south east west enter exit}.include? @context[:command]))
       @output.write "You're " + @context[:room].title + ".\n"
-    else
+    elsif !@context[:room].seenit
       @output.write @context[:room].description + "\n"
       show_objects
       @context[:room].seenit = true
