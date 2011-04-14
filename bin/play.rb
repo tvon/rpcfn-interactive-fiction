@@ -220,6 +220,7 @@ class Game
   def play!
     start!
     execute_one_command! until ended?
+    @writer.error "You have died of dysentery."
   end
 
   def start!
