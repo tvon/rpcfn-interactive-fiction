@@ -71,6 +71,17 @@ class Obj < GameObject
 
 end
 
+class Action < GameObject
+  def parse(block)
+
+  end
+
+  def succeeds?(context)
+
+    true
+  end
+end
+
 class Context
   attr_accessor :room, :command, :inventory, :arg
 
