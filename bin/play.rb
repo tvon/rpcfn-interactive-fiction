@@ -153,6 +153,14 @@ class OutputWriter
     @output.write "\033[32m#{s}\033[0m\n" 
   end
 
+  def write(s)
+    @output.write "#{s}\n"
+  end
+
+  def puts(s)
+    @output.write s
+  end
+
 end
 
 class Game
@@ -162,7 +170,7 @@ class Game
     @input  = options.fetch(:input)  { $stdin  }
     @output = options.fetch(:output) { $stdout }
 
-    #@writer = OutputWriter.new(@output)
+    @writer = OutputWriter.new(@output)
 
     @aliases = {}
 
@@ -225,11 +233,11 @@ class Game
 
     # Short summary if we've moved into this room and we've been here before.
     if !@context.been_here?
-      @output.write @context.room.description + "\n"
+      @writer.write @context.room.description
       show_items
       @context.room.seenit = true
     elsif %w{north south east west enter exit}.include? @context.command
-      @output.write "You're " + @context.room.to_s + ".\n"
+      @writer.write "You're #{@context.room.to_s}."
     end
 
     prompt
@@ -254,12 +262,12 @@ class Game
   end
 
   def unknown_command
-    @output.write "and then?\n"
+    @writer.error "...and then?"
     prompt
   end
 
   def prompt
-    @output.write "> "
+    @writer.puts "> "
   end
 
   def ended?
@@ -277,7 +285,7 @@ class Game
 
   def show_items
     @context.things_here.each do |id|
-      @output.write @context.items[id].to_s + "\n"
+      @writer.write @context.items[id].to_s
     end
   end
 
@@ -292,18 +300,18 @@ class Game
       if @context.items[obj].terms.map{|i| i.downcase}.include? item
         @context.things_here << obj
         @context.inventory.delete obj
-        @output.write "OK\n"
+        @writer.success "OK"
       end
     end
 
     if start_len == @context.inventory.length
-      @output.write "You don't have anything like that\n"
+      @writer.error "You don't have anything like that"
     end
 
   end
 
   def look
-    @output.write @context.room.description + "\n"
+    @writer.write @context.room.description
     show_items
   end
 
@@ -311,7 +319,7 @@ class Game
     if @context.room.exits.has_key? @context.command
       @context.room = @rooms[ @context.room.exits[ @context.command ] ]
     else
-      @output.write "There is no way to go in that direction\n"
+      @writer.error "There is no way to go in that direction"
       prompt
       false
     end
@@ -319,10 +327,10 @@ class Game
 
   def inventory 
     if @context.inventory.empty?
-      @output.write "You're not carrying anything\n"
+      @writer.write "You're not carrying anything"
     else
       @context.inventory.each do |id|
-        @output.write @context.items[id].terms.first + "\n"
+        @writer.write @context.items[id].terms.first
       end
     end
   end
@@ -336,12 +344,12 @@ class Game
       if @context.items[obj].terms.map{|i| i.downcase}.include? item_id
         @context.inventory << obj
         @context.things_here.delete obj
-        @output.write "OK\n"
+        @writer.success "OK"
       end
     end
 
     if start_len == @context.inventory.length
-      @output.write "Do what with the what?\n"
+      @writer.error "Do what with the what?"
     end
 
   end
