@@ -76,7 +76,7 @@ class Game
 
     @aliases = {}
 
-    %w{north south east west enter exit look take drop inventory}.each { |c| @aliases[c] = c }
+    %w{north south east west enter exit look take drop inventory quit}.each { |c| @aliases[c] = c }
 
     parsefile story_path
 
@@ -127,8 +127,8 @@ class Game
     else
       @output.write @context[:room].description + "\n"
       @context[:room].seenit = true
-      show_objects
     end
+    show_objects
     prompt
   end
 
@@ -147,7 +147,6 @@ class Game
     else
       unknown_command
     end
-
   end
 
   def unknown_command
@@ -160,7 +159,7 @@ class Game
   end
 
   def ended?
-    @cmd == 'quit'
+    @context[:command] == 'quit'
   end
 
   def method_missing(sym, *args)
@@ -168,8 +167,6 @@ class Game
     if cmd
       if ['north', 'south', 'east', 'west', 'enter', 'exit'].include? cmd
         handle_movement
-      else
-        @output.write "Command not found\n"
       end
     end
   end
