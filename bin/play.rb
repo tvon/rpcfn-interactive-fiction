@@ -86,9 +86,7 @@ class Context
   attr_accessor :room, :command, :inventory, :arg
 
   def initialize
-    @room = nil
     @inventory = []
-    @command = nil
   end
 
   def been_here?
