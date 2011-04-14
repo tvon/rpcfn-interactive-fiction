@@ -131,7 +131,9 @@ class Game
       show_objects
       @context[:room].seenit = true
     end
+
     prompt
+
   end
 
   def execute_one_command!
