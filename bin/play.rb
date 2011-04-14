@@ -16,14 +16,14 @@ end
 
 class Room < GameObject
   # Define attrs?
-  attr_accessor :exits, :objects, :title, :description, :seenit
+  attr_accessor :exits, :items, :title, :description, :seenit
 
   def parse(block)
 
     @seenit = false  # Need to declare?
     
     @exits = {} # XXX
-    @objects = []
+    @items = []
     
     # Could do this all in one big fugly regex, but this is cleaner and clearer
     /^  Title: (?<title>.*?)\n +Description:\n +(?<description>.*?)\n  Exits:/m.match(block) do |m|
@@ -40,7 +40,7 @@ class Room < GameObject
     # Of course this means object must come last
     / +Objects:\n(?<objects>.*)/m.match(block) do |m|
       m[:objects].split.each do |o|
-        @objects << o.strip
+        @items << o.strip
       end
     end
 
@@ -97,7 +97,7 @@ class Context
   end
 
   def things_here
-    @room.objects
+    @room.items
   end
 
 end
@@ -121,7 +121,7 @@ class Game
   def parse_file(path)
 
     @rooms = {}
-    @objects = {}
+    @items = {}
     @context = Context.new
 
     open(path, 'rb') do |f|
@@ -134,7 +134,7 @@ class Game
 
       #/^Object (?<id>.*?):\n(?<block>.*?)\n\n/m.match(data) do |m|
       data.scan /^Object (?<id>.*?):\n(?<block>.*?)\n\n/m do |id, block|
-        @objects[id] = Obj.new(id, block)
+        @items[id] = Obj.new(id, block)
       end
 
       /^Synonyms:\n(?<syns>.*)/m.match(data) do |m|
@@ -164,7 +164,7 @@ class Game
       @output.write "You're " + @context.room.to_s + ".\n"
     elsif !@context.been_here?
       @output.write @context.room.description + "\n"
-      show_objects
+      show_items
       @context.room.seenit = true
     end
 
@@ -211,9 +211,9 @@ class Game
     end
   end
 
-  def show_objects
+  def show_items
     @context.things_here.each do |id|
-      @output.write @objects[id].to_s + "\n"
+      @output.write @items[id].to_s + "\n"
     end
   end
 
@@ -227,7 +227,7 @@ class Game
     start_len = @context.inventory.length
 
     @context.things_here.each do |obj|
-      if @objects[obj].terms.map{|i| i.downcase}.include? item_id
+      if @items[obj].terms.map{|i| i.downcase}.include? item_id
         @context.inventory << obj
         @context.things_here.delete obj
         @output.write "OK\n"
@@ -244,7 +244,7 @@ class Game
     item = @context.arg
     start_len = @context.inventory.length
     @context.inventory.each do |obj|
-      if @objects[obj].terms.map{|i| i.downcase}.include? item
+      if @items[obj].terms.map{|i| i.downcase}.include? item
         @context.things_here << obj
         @context.inventory.delete obj
         @output.write "OK\n"
@@ -259,7 +259,7 @@ class Game
 
   def look
     @output.write @context.room.description + "\n"
-    show_objects
+    show_items
   end
 
   def handle_movement
@@ -276,7 +276,7 @@ class Game
       @output.write "You're not carrying anything\n"
     else
       @context.inventory.each do |id|
-        @output.write @objects[id].terms.first + "\n"
+        @output.write @items[id].terms.first + "\n"
       end
     end
   end
