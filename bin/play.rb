@@ -106,7 +106,6 @@ class Game
 
   def initialize(story_path, options={})
 
-    # XXX: would use @input.get to fetch user input
     @input  = options.fetch(:input)  { $stdin  }
     @output = options.fetch(:output) { $stdout }
 
