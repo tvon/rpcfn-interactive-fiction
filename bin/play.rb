@@ -3,6 +3,7 @@
 require 'pp'
 
 class GameObject
+
   def initialize(id, block)
     @id = id
     parse(block)
@@ -22,10 +23,9 @@ class Room < GameObject
 
     @seenit = false  # Need to declare?
     
-    @exits = {} # XXX
+    @exits = {}
     @items = []
     
-    # Could do this all in one big fugly regex, but this is cleaner and clearer
     /^  Title: (?<title>.*?)\n +Description:\n +(?<description>.*?)\n  Exits:/m.match(block) do |m|
       @title = m[:title].strip
       @description = m[:description].strip.split.join(' ') # probably a better way to clean this...
@@ -37,7 +37,6 @@ class Room < GameObject
       end
     end
 
-    # Of course this means object must come last
     / +Objects:\n(?<objects>.*)/m.match(block) do |m|
       m[:objects].split.each do |o|
         @items << o.strip
@@ -82,7 +81,7 @@ class Action < GameObject
 end
 
 class Context
-  attr_accessor :room, :command, :inventory, :arg, :items
+  attr_accessor :room, :command, :inventory, :arg, :items, :rooms
 
   def initialize
     @inventory = []
@@ -100,28 +99,91 @@ class Context
     @room.items
   end
 
+  def things_here_to_s
+    s = ''
+    things_here.each do |id|
+      s += @items[id].to_s + "\n"
+    end
+    s
+  end
+
   #################################
   # Commands
   #################################
+  
+  def look
+    m = (@room.description + "\n" + things_here_to_s)
+    return [true, m]
+  end
 
   def take
-    item_id = @context.arg
+    item_id = @arg
 
-    start_len = @context.inventory.length
+    # Assume failure unless told otherwise...
+    result = [false, 'Do what with the what?']
 
-    @context.things_here.each do |obj|
-      if @items[obj].terms.map{|i| i.downcase}.include? item_id
-        @context.inventory << obj
-        @context.things_here.delete obj
-        @output.write "OK\n"
+    things_here.each do |obj|
+      if @items[obj].terms.map{ |i| i.downcase }.include? item_id
+        @inventory << obj
+        things_here.delete obj
+        result = [true, 'OK']
       end
     end
 
-    if start_len == @context.inventory.length
-      @output.write "Do what with the what?\n"
-    end
+    result
 
   end
+
+  def drop
+    item = @arg
+
+    result = [false, "You don't have anything like that."]
+
+    @inventory.each do |obj|
+      if @items[obj].terms.map{|i| i.downcase}.include? item
+        things_here << obj
+        @inventory.delete obj
+        result = [true, 'OK']
+      end
+    end
+
+    result
+
+  end
+
+  def inventory 
+    if @inventory.empty?
+      result = [false, "You're not carrying anything."]
+    else
+      s = ''
+      @inventory.each do |id|
+        s += @items[id].terms.first
+      end
+
+      result = [true, s]
+    end
+
+    result
+  end
+
+
+  def move(direction)
+    if @room.exits.has_key? direction
+      @room = @rooms[ @room.exits[ direction ] ]
+    else
+      return [false, "There is no way to go in that direction"]
+    end
+  end
+
+  def method_missing(sym, *args)
+    cmd = sym.to_s
+    if cmd
+      if ['north', 'south', 'east', 'west', 'enter', 'exit'].include? cmd
+        move(cmd)
+      end
+    end
+  end
+
 
 end
 
@@ -136,8 +198,7 @@ class Command
   end
 end
 
-# TODO: colorized output via "writer.error 'foo'", "writer.success 'OK'", 'writer.embiggen "something"'
-# Related: scan item descriptions for "terms" and distinguish in output to make
+# TODO: scan item descriptions for "terms" and distinguish in output to make
 # clear what you have to type to refer to that item.
 class OutputWriter
 
@@ -150,7 +211,7 @@ class OutputWriter
   end
 
   def success(s)
-    @output.write "\033[32m#{s}\033[0m\n" 
+    @output.write "\033[34m#{s}\033[0m\n" 
   end
 
   def write(s)
@@ -182,16 +243,18 @@ class Game
 
   def parse_file(path)
 
-    @rooms = {}
     @context = Context.new
+    rooms = {}
 
     open(path, 'rb') do |f|
       # Inelegant but effective, initially just scan for each object type we know about
       data = f.read
       data.scan /^Room (.*?):\n(.*?)\n\n/m do |id, block|
-        @rooms[id] = Room.new(id, block)
-        @context.room = @rooms[id] unless @context.room # Assumes first shown room is starting point
+        rooms[id] = Room.new(id, block)
+        @context.room = rooms[id] unless @context.room # Assumes first shown room is starting point
       end
+
+      @context.rooms = rooms
 
       items = {}
       data.scan /^Object (?<id>.*?):\n(?<block>.*?)\n\n/m do |id, block|
@@ -201,7 +264,6 @@ class Game
         items[id].terms.each do |term|
           items[term] = items[id]
         end
-
       end
 
       @context.items = items
@@ -224,9 +286,6 @@ class Game
   end
 
   def start!
-#    @output.write @context.room.description + "\n"
-#    @context.room.seenit = true
-#    show_items
     refresh
   end
 
@@ -241,8 +300,6 @@ class Game
       @writer.write "You're #{@context.room.to_s}."
     end
 
-    prompt
-
   end
 
   def execute_one_command!
@@ -256,15 +313,24 @@ class Game
 
     if command
       @context.command = command
-      refresh if send(command)
+      success, msg = @context.send(command)
+      if success
+        @writer.write msg
+        refresh
+      else
+        @writer.error msg
+      end
+      #refresh if @context.send(command)
     else
       unknown_command
     end
+
+    prompt
+
   end
 
   def unknown_command
     @writer.error "...and then?"
-    prompt
   end
 
   def prompt
@@ -275,88 +341,11 @@ class Game
     @context.command == 'quit'
   end
 
-  def method_missing(sym, *args)
-    cmd = @aliases[sym.to_s]
-    if cmd
-      if ['north', 'south', 'east', 'west', 'enter', 'exit'].include? cmd
-        handle_movement
-      end
-    end
-  end
-
   def show_items
     @context.things_here.each do |id|
       @writer.write @context.items[id].to_s
     end
   end
-
-  #################################
-  # Commands
-  #################################
-
-  def drop
-    item = @context.arg
-    start_len = @context.inventory.length
-    @context.inventory.each do |obj|
-      if @context.items[obj].terms.map{|i| i.downcase}.include? item
-        @context.things_here << obj
-        @context.inventory.delete obj
-        @writer.success "OK"
-        prompt
-      end
-    end
-
-    if start_len == @context.inventory.length
-      @writer.error "You don't have anything like that"
-    end
-
-  end
-
-  def look
-    @writer.write @context.room.description
-    show_items
-  end
-
-  def handle_movement
-    if @context.room.exits.has_key? @context.command
-      @context.room = @rooms[ @context.room.exits[ @context.command ] ]
-    else
-      @writer.error "There is no way to go in that direction"
-      prompt
-      false
-    end
-  end
-
-  def inventory 
-    if @context.inventory.empty?
-      @writer.write "You're not carrying anything"
-    else
-      @context.inventory.each do |id|
-        @writer.write @context.items[id].terms.first
-      end
-    end
-  end
-
-  def take
-    item_id = @context.arg
-
-    start_len = @context.inventory.length
-
-    @context.things_here.each do |obj|
-      if @context.items[obj].terms.map{|i| i.downcase}.include? item_id
-        @context.inventory << obj
-        @context.things_here.delete obj
-        @writer.success "OK"
-        prompt
-      end
-    end
-
-    if start_len == @context.inventory.length
-      @writer.error "Do what with the what?"
-    end
-
-  end
-
 
 end
 
