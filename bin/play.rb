@@ -161,6 +161,7 @@ class Context
       end
 
       result = [true, s]
+
     end
 
     result
@@ -170,6 +171,18 @@ class Context
   def move(direction)
     if @room.exits.has_key? direction
       @room = @rooms[ @room.exits[ direction ] ]
+
+      if been_here?
+        desc = "You're #{@room.to_s}."
+      else
+        desc = @room.description
+      end
+
+      # Empty if there are no things...
+      desc += things_here_to_s
+
+      @room.seenit = true
+      result = [true, desc]
     else
       return [false, "There is no way to go in that direction"]
     end
@@ -185,17 +198,6 @@ class Context
   end
 
 
-end
-
-# TODO?  Declare command core name, any aliases and success/failure mesages.
-class Command
-  attr_accessor :state
-
-  def initialize(name, success, failure)
-    @name = name
-    @success = success
-    @failure = failure
-  end
 end
 
 # TODO: scan item descriptions for "terms" and distinguish in output to make
@@ -238,6 +240,8 @@ class Game
     %w{north south east west enter exit look take drop inventory quit}.each { |c| @aliases[c] = c }
 
     parse_file story_path
+
+    @context.room.seenit = true
 
   end
 
@@ -286,20 +290,8 @@ class Game
   end
 
   def start!
-    refresh
-  end
-
-  def refresh
-
-    # Short summary if we've moved into this room and we've been here before.
-    if !@context.been_here?
-      @writer.write @context.room.description
-      show_items
-      @context.room.seenit = true
-    elsif %w{north south east west enter exit}.include? @context.command
-      @writer.write "You're #{@context.room.to_s}."
-    end
-
+    @writer.write @context.room.description
+    prompt
   end
 
   def execute_one_command!
@@ -312,15 +304,12 @@ class Game
     end
 
     if command
-      @context.command = command
       success, msg = @context.send(command)
       if success
         @writer.write msg
-        refresh
       else
         @writer.error msg
       end
-      #refresh if @context.send(command)
     else
       unknown_command
     end
